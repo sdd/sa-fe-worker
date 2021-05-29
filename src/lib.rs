@@ -11,10 +11,10 @@ use serde::{Serialize, Deserialize};
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 const POINT_EXCLUSION_RADIUS: f64 = 20.0;
-const POINT_THRESHOLD: u8 = 45;
+const POINT_THRESHOLD: u8 = 75;
 pub const PATCH_SIZE: u32 = 20;
 
-pub const MEDIAN_RADIUS: usize = 20;
+pub const MEDIAN_RADIUS: usize = 40;
 pub const MEDIAN_WINDOW_SIZE: usize = MEDIAN_RADIUS * 2 + 1;
 
 #[wasm_bindgen]
@@ -124,6 +124,7 @@ pub fn process_image(img_data: ImageData) -> JsValue {
         let processed_val = greyscale_val.saturating_sub(hist.median());
 
         state = match state {
+
             State::Searching => {
                 let matching_point: Option<usize> = recent_points.iter().find(|&p| {
                     let p_x: u32 = points[*p].x;
@@ -140,6 +141,7 @@ pub fn process_image(img_data: ImageData) -> JsValue {
                     State::Searching
                 }
             },
+
             State::WithinExistingPoint(index) => {
                 let QueryPointCandidate { val, .. } = points[index];
                 if processed_val > val {
@@ -151,6 +153,7 @@ pub fn process_image(img_data: ImageData) -> JsValue {
                     State::WithinGuard(POINT_EXCLUSION_RADIUS as usize)
                 }
             },
+
             State::WithinNewPoint { x: pt_x, y: pt_y, max_val } => {
                 if processed_val > max_val {
                     State::WithinNewPoint { x: x as u32, y: y as u32, max_val: processed_val }
@@ -166,6 +169,7 @@ pub fn process_image(img_data: ImageData) -> JsValue {
                     State::WithinGuard(POINT_EXCLUSION_RADIUS as usize)
                 }
             },
+
             State::WithinGuard(remaining) => {
                 if remaining > 0 {
                     State::WithinGuard(remaining - 1)
@@ -175,11 +179,10 @@ pub fn process_image(img_data: ImageData) -> JsValue {
             }
         };
 
-        x = if x == width { y += 1; 0 } else { x + 1 };
+        x = if x + 1 == width { y += 1; 0 } else { x + 1 };
     }
 
     // TODO: fit points?
-
     JsValue::from_serde(&points).unwrap()
 }
 
