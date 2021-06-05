@@ -2,6 +2,9 @@
 name = "sa-fe-worker"
 version = "0.1.0"
 authors = ["Scott Donnelly <scott@donnel.ly>"]
+description = "WASM query point extractor to extract candidate stars from an image"
+license = "UNLICENSED"
+repository = "git@github.com:sdd/sa-fe-worker.git"
 edition = "2018"
 
 # See https://rustwasm.github.io/wasm-pack/book/tutorials/npm-browser-packages/template-deep-dive/cargo-toml.html
