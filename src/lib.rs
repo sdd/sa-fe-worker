@@ -11,6 +11,7 @@ use serde::{Serialize, Deserialize};
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 const POINT_EXCLUSION_RADIUS: f64 = 20.0;
+const POINT_EXCLUSION_RADIUS_SQ: u32 = (POINT_EXCLUSION_RADIUS as u32) * (POINT_EXCLUSION_RADIUS as u32);
 const POINT_THRESHOLD: u8 = 75;
 pub const PATCH_SIZE: u32 = 20;
 
@@ -18,7 +19,7 @@ pub const MEDIAN_RADIUS: usize = 40;
 pub const MEDIAN_WINDOW_SIZE: usize = MEDIAN_RADIUS * 2 + 1;
 
 #[wasm_bindgen]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct QueryPointCandidate {
     pub x: u32,
     pub y: u32,
@@ -72,6 +73,13 @@ impl HistSet {
 #[wasm_bindgen]
 pub fn process_image(img_data: ImageData) -> JsValue {
     let img: PhotonImage = img_data.into();
+
+    let points = process_image_impl(img);
+
+    JsValue::from_serde(&points).unwrap()
+}
+
+pub fn process_image_impl(img: PhotonImage) -> Vec<QueryPointCandidate> {
 
     let mut points: Vec<QueryPointCandidate> = vec![];
     let mut recent_points: Vec<usize> = vec![];
@@ -150,7 +158,15 @@ pub fn process_image(img_data: ImageData) -> JsValue {
                 } else if processed_val > POINT_THRESHOLD {
                     State::WithinExistingPoint(index)
                 } else {
-                    State::WithinGuard(POINT_EXCLUSION_RADIUS as usize)
+                    let diff_x: u32 = (x as i32 - points[index].x as i32).abs() as u32;
+                    let diff_y: u32 = (y as i32 - points[index].y as i32).abs() as u32;
+                    let dist2_to_existing = diff_x * diff_x + diff_y + diff_y;
+
+                    if dist2_to_existing > POINT_EXCLUSION_RADIUS_SQ as u32 {
+                        State::WithinGuard(POINT_EXCLUSION_RADIUS as usize)
+                    } else {
+                        State::WithinExistingPoint(index)
+                    }
                 }
             },
 
@@ -183,7 +199,7 @@ pub fn process_image(img_data: ImageData) -> JsValue {
     }
 
     // TODO: fit points?
-    JsValue::from_serde(&points).unwrap()
+    points
 }
 
 fn get_greyscale_value(pixels: &Vec<u8>, i: usize) -> u8 {
@@ -191,4 +207,20 @@ fn get_greyscale_value(pixels: &Vec<u8>, i: usize) -> u8 {
     let g_val = pixels[i + 1] as u32;
     let b_val = pixels[i + 2] as u32;
     ((r_val + g_val + b_val) / 3).min(255) as u8
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use photon_rs::native::open_image;
+
+    #[test]
+    fn test_get_img_centre() {
+        let img_data = open_image("./SAM_4298.JPG").expect("File should open");
+
+        let result = process_image_impl(img_data);
+
+        println!("count: {:?}", &result.len());
+        println!("result: {:?}", &result);
+    }
 }
